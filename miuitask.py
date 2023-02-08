@@ -329,22 +329,41 @@ class MIUITask:
                                      proxies=proxies)
             response_data = response.text.lstrip('&').lstrip('START').lstrip('&')
             r_json = json.loads(response_data)
-            if r_json['code'] == 70016:
-                w_log('小米账号登录失败：用户名或密码不正确')
+
+            # 登陆操作成功
+            if r_json.get('pwd') == 1:
+                w_log('账号登录完成')
+                return True
+
+            # 根据错误代码判断出错情况
+            err_code = r_json.get('code')
+            if err_code or not self.get_vip_cookie(r_json['location']):  # that means err_code != 0 or location is None
+                if err_code in (70002, 70016):
+                    w_log('小米账号登录失败：用户名或密码不正确')
+                    return False
+                if err_code in 81003:
+                    w_log('小米账号登录失败：需要进一步验证')
+                    return False
+                if err_code in 20003:
+                    w_log('小米账号登录失败：用户名无效')
+                    return False
+                if err_code in 87001:
+                    w_log('小米账号登录失败：无效返回')
+                    return False
+                if err_code in 22009:
+                    w_log('小米账号登录失败：Package Name Denied')
+                    return False
+
+            # 因风控原因登陆失败
+            if r_json.get('securityStatus') == 16:
+                w_log('小米帐号登陆失败：，需要完成验证码，请尝试修改UA或设备ID')
                 return False
-            if r_json['code'] != 0:
-                w_log('小米账号登录失败：' + r_json['desc'])
-                return False
-            if r_json['pwd'] != 1:
-                w_log('当前账号需要短信验证码，请尝试修改UA或设备ID')
-                return False
-            if not self.get_vip_cookie(r_json['location']):
-                w_log('小米账号登录成功，社区获取 Cookie 失败')
-                return False
-            w_log('账号登录完成')
-            return True
+
+            w_log('小米账号登录失败：未知错误')
+            return False
+
         except Exception as e:
-            w_log("登录小米账号出错")
+            w_log("登录小米账号时出错")
             w_log(e)
             return False
 
